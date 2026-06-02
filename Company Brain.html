@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bit — The Company Brain</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800;900&family=Newsreader:ital,opsz,wght@1,6..72,400;1,6..72,500&display=swap" rel="stylesheet" />
+<style>
+  /* Bit's real brand fonts. */
+  @font-face { font-family: "Roobert"; src: url("fonts/Roobert-Light.otf") format("opentype"); font-weight: 300; font-display: swap; }
+  @font-face { font-family: "Roobert"; src: url("fonts/Roobert-Regular.otf") format("opentype"); font-weight: 400; font-display: swap; }
+  @font-face { font-family: "Roobert"; src: url("fonts/Roobert-Medium.otf") format("opentype"); font-weight: 500; font-display: swap; }
+  @font-face { font-family: "Roobert"; src: url("fonts/Roobert-Bold.otf") format("opentype"); font-weight: 600 700; font-display: swap; }
+  @font-face { font-family: "Roobert"; src: url("fonts/Roobert-Heavy.otf") format("opentype"); font-weight: 800 900; font-display: swap; }
+  @font-face { font-family: "CenturyAccent"; src: url("fonts/Century-Medium.otf") format("opentype"); font-weight: 400 600; font-display: swap; }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: "Roobert", "Schibsted Grotesk", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+    overflow: hidden;
+  }
+  /* serif accent: Century (real Bit font) replaces the Newsreader fallback */
+  [style*="Newsreader"] { font-family: "CenturyAccent", "Newsreader", Georgia, serif !important; font-style: normal !important; }
+
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+  /* ---- The planet core ---- */
+  .planet-stage { position: relative; display: grid; place-items: center; }
+  .planet {
+    position: relative; width: var(--d); height: var(--d); border-radius: 50%;
+    background:
+      radial-gradient(circle at 33% 27%,
+        color-mix(in srgb, var(--c) 30%, #15110c) 0%,
+        #100d0a 42%,
+        #070605 78%,
+        #050403 100%);
+    box-shadow:
+      inset -16px -20px 46px rgba(0,0,0,0.7),
+      inset 12px 14px 40px color-mix(in srgb, var(--c) 22%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--c) 35%, transparent),
+      0 0 26px color-mix(in srgb, var(--c) 40%, transparent);
+    overflow: hidden;
+    isolation: isolate;
+  }
+  /* rotating meridian surface */
+  .planet-surface { position: absolute; inset: 0; border-radius: 50%; overflow: hidden;
+    -webkit-mask: radial-gradient(circle at 50% 50%, #000 58%, transparent 92%);
+            mask: radial-gradient(circle at 50% 50%, #000 58%, transparent 92%); }
+  .planet-grid {
+    position: absolute; top: -10%; left: -50%; width: 200%; height: 120%;
+    background-image:
+      repeating-linear-gradient(90deg,
+        transparent 0 26px,
+        color-mix(in srgb, var(--c) 34%, transparent) 26px 27px),
+      repeating-linear-gradient(0deg,
+        transparent 0 22px,
+        color-mix(in srgb, var(--c) 16%, transparent) 22px 23px);
+    animation: planetSpin 26s linear infinite;
+    opacity: 0.9;
+  }
+  @keyframes planetSpin { to { transform: translateX(-25%); } }
+  /* latitude bands curving the globe */
+  .planet-lat { position: absolute; inset: 8%; border-radius: 50%;
+    background:
+      radial-gradient(120% 60% at 50% 50%, transparent 48%, color-mix(in srgb, var(--c) 12%, transparent) 49% 50%, transparent 51%);
+    pointer-events: none; }
+  /* specular highlight (fixed light source, top-left) */
+  .planet-spec { position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+    background: radial-gradient(circle at 31% 25%,
+      color-mix(in srgb, var(--c) 60%, #fff) 0%,
+      color-mix(in srgb, var(--c) 34%, transparent) 9%,
+      transparent 26%); mix-blend-mode: screen; }
+  /* atmosphere rim */
+  .planet-rim { position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+    box-shadow: inset 0 0 26px color-mix(in srgb, var(--c) 38%, transparent),
+                inset 8px 10px 34px rgba(0,0,0,0.55);
+    border: 1.5px solid color-mix(in srgb, var(--c) 60%, transparent); }
+  /* the words, in 3D relief */
+  .planet-text { position: absolute; inset: 0; display: grid; place-items: center; text-align: center;
+    transform: perspective(520px) rotateX(9deg); pointer-events: none; }
+  .planet-kicker { font: 700 10px/1 "Roobert", sans-serif; letter-spacing: 0.24em; text-transform: uppercase;
+    color: var(--c); text-shadow: 0 0 12px color-mix(in srgb, var(--c) 70%, transparent); margin-bottom: 6px; }
+  .planet-title { font: 800 var(--ts) "Roobert", sans-serif; line-height: 0.92; letter-spacing: -0.02em; color: #F7F3ED;
+    text-shadow:
+      0 1px 0 rgba(0,0,0,.5), 0 2px 0 rgba(0,0,0,.4), 0 3px 1px rgba(0,0,0,.4),
+      0 6px 16px rgba(0,0,0,.7),
+      0 0 26px color-mix(in srgb, var(--c) 55%, transparent); }
+  .planet-sub { font: 400 10.5px "CenturyAccent", serif; color: rgba(247,243,237,0.7); margin-top: 8px;
+    text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+
+  @media (prefers-reduced-motion: reduce) { .planet-grid { animation: none; } }
+
+  ::-webkit-scrollbar { width: 9px; }
+  ::-webkit-scrollbar-thumb { background: rgba(150,150,150,0.35); border-radius: 999px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script src="brainData.js"></script>
+<script src="theme.js"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="Scene3D.jsx"></script>
+<script type="text/babel" src="DetailPanel.jsx"></script>
+<script type="text/babel" src="App.jsx"></script>
+<script type="text/babel" data-presets="react">
+  ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(window.App));
+</script>
+</body>
+</html>

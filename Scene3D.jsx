@@ -75,23 +75,33 @@
     nodes.push({ id: "external", type: "external", p: extP, label: "External data" });
     conns.push({ a: { x: 0, y: 0, z: 0 }, b: extP, kind: "external", seed: sd() });
 
-    // cross-fleet communication links — sampled as generous 3D arcs that loft
-    // HIGH above the sphere (like the hand-drawn sketch) and rotate with it.
-    // The control point is pushed far out along the midpoint direction so each
-    // link reads as a big sweeping bow over the planet.
-    (BRAIN.LINKS || []).forEach((lk) => {
+    // cross-fleet communication links — each one bows in its OWN direction and
+    // height, so the set fans out all around the sphere (over, under, left,
+    // right, short and wide) instead of forming a symmetric basket.
+    BRAIN.LINKS.forEach((lk, li) => {
       const A = fleetPos[lk.a], B = fleetPos[lk.b];
       if (!A || !B) return;
       const mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2, mz = (A.z + B.z) / 2;
-      const ml = Math.hypot(mx, my, mz) || 1;
-      // how wide apart the two fleets are → wider links arc higher
       const span = Math.hypot(B.x - A.x, B.y - A.y, B.z - A.z);
-      const lift = R1 * 0.9 + span * 0.55;   // generous outward loft
-      const ctrl = {
-        x: mx + (mx / ml) * lift,
-        y: my + lift * 0.55,                  // strong vertical bow → arcs ride high
-        z: mz + (mz / ml) * lift,
+
+      // a stable pseudo-random per link (varies direction + height, no flicker)
+      const r1 = (Math.sin(li * 12.9898) * 43758.5453) % 1;
+      const r2 = (Math.sin(li * 78.233) * 12543.123) % 1;
+      const r3 = (Math.sin(li * 39.425) * 24634.642) % 1;
+      const rnd = (x) => (x < 0 ? x + 1 : x);
+      const a1 = rnd(r1) * TAU;            // azimuth of the bow
+      const a2 = (rnd(r2) - 0.5) * Math.PI; // elevation: above or below
+      const hgt = 0.45 + rnd(r3) * 1.1;     // how far it bows (short ↔ wide)
+
+      // direction the arc bulges toward, in 3D
+      const dir = {
+        x: Math.cos(a2) * Math.cos(a1),
+        y: Math.sin(a2),
+        z: Math.cos(a2) * Math.sin(a1),
       };
+      const lift = (R0 * 0.6 + span * 0.6) * hgt;
+      const ctrl = { x: mx + dir.x * lift, y: my + dir.y * lift, z: mz + dir.z * lift };
+
       const SEG = 30, path = [];
       for (let s = 0; s <= SEG; s++) {
         const u = s / SEG, v = 1 - u;
@@ -239,7 +249,7 @@
           return 0.4;
         };
 
-        // --- spoke + human lines (faint, gradient so the core isn't busy) ---
+        // --- spoke + human lines (the core structure — kept clearly visible) ---
         for (const cn of model.conns) {
           if (cn.kind !== "spoke" && cn.kind !== "human") continue;
           const rel = relConn(cn);
@@ -247,11 +257,11 @@
           const a = project(view(cn.a)), b = project(view(cn.b));
           const on = rel >= 0.99 && (selFleet === cn.fleetId || selTeam === cn.teamId);
           const g = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
-          const tip = on ? rgba(c.accent, 0.5 * rel) : rgba("#ffffff", 0.16 * rel);
-          if (cn.kind === "spoke") { g.addColorStop(0, rgba("#ffffff", 0)); g.addColorStop(0.55, rgba("#ffffff", 0)); g.addColorStop(1, tip); }
-          else { g.addColorStop(0, rgba("#ffffff", 0.04 * rel)); g.addColorStop(1, tip); }
+          const tip = on ? rgba(c.accent, 0.7 * rel) : rgba("#ffffff", 0.34 * rel);
+          if (cn.kind === "spoke") { g.addColorStop(0, rgba("#ffffff", 0)); g.addColorStop(0.4, rgba("#ffffff", 0.06 * rel)); g.addColorStop(1, tip); }
+          else { g.addColorStop(0, rgba(c.warm, 0.12 * rel)); g.addColorStop(1, on ? rgba(c.accent, 0.7 * rel) : rgba(c.warm, 0.34 * rel)); }
           ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
-          ctx.strokeStyle = g; ctx.lineWidth = on ? 1.5 : 1; ctx.stroke();
+          ctx.strokeStyle = g; ctx.lineWidth = on ? 1.7 : 1.2; ctx.stroke();
         }
 
         // --- cross-fleet communication links (high 3D arcs over the planet) ---
@@ -265,7 +275,7 @@
           if (rel <= 0.02) continue;
           const pts = cn.path.map((p) => { const q = view(p); return { s: project(q), z: q.z }; });
           commsArcs.push({ pts, rel, seed: cn.seed });
-          const lw = rel > 0.9 ? 1.7 : 1.1;
+          const lw = rel > 0.9 ? 1.0 : 0.7;
           for (let i = 1; i < pts.length; i++) {
             const a0 = pts[i - 1], a1 = pts[i];
             const z = (a0.z + a1.z) / 2;
@@ -273,10 +283,10 @@
             // is this segment hidden behind the sphere?
             const behind = z < 0 && Math.hypot(mxs - cProj.x, mys - cProj.y) < R0k * 0.96;
             let a;
-            if (behind) a = 0.05 * rel;                 // tucked behind the globe → nearly gone
+            if (behind) a = 0.03 * rel;                 // tucked behind the globe → nearly gone
             else {
               const front = clamp((z / (model.base * 0.6) + 1) / 2, 0, 1);
-              a = (0.3 + 0.42 * front) * rel;            // high front arc → bright
+              a = (0.12 + 0.22 * front) * rel;           // softer than the spokes
             }
             ctx.beginPath();
             ctx.moveTo(a0.s.x, a0.s.y);

@@ -401,12 +401,17 @@
   ];
 
   // ---- Cross-fleet communication (fleets that talk to each other) ----------
-  // NOTE: the brief named fleets from the old model ("Resourcing", "Client
-  // Growth", "Distribution & Insight"). Mapped to the closest fleet in the new
-  // structure — adjust the ids below if a different pairing is intended.
+  // These links show real hand-offs between teams. Together they trace the
+  // company's loop: win the work, deliver it, run the numbers, tell the story,
+  // and keep the team staffed and growing.
   const LINKS = [
-    { a: "manage", b: "hire", label: "Resourcing ↔ Hiring" },     // Control ↔ Culture
-    { a: "engage", b: "maintain", label: "Reach ↔ Account growth" }, // Content ↔ Client Development
+    { a: "outreach", b: "prepare", label: "Won work → scoping" },        // Client Dev → Client Delivery
+    { a: "execute", b: "manage", label: "Delivery → invoicing & resourcing" }, // Client Delivery → Control
+    { a: "thought", b: "outreach", label: "Content feeds the pipeline" }, // Content → Client Dev
+    { a: "engage", b: "maintain", label: "Campaigns → account growth" },  // Content → Client Dev
+    { a: "exceed", b: "thought", label: "Great work → a story" },         // Client Delivery → Content
+    { a: "manage", b: "hire", label: "Resourcing → hiring" },            // Control → Culture
+    { a: "develop", b: "hire", label: "Growth ↔ hiring" },               // Culture (cross-fleet)
   ];
 
   window.BRAIN = { CORE, EXTERNAL, HUMAN, TEAMS, LINKS };

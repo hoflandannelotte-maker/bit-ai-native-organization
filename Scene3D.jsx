@@ -22,7 +22,7 @@
     const R0 = base * 0.16;    // brain radius
     const R1 = base * 0.305;   // fleet ring
     const R2 = base * 0.45;    // human ring
-    const R3 = base * 0.62;    // external
+    const R3 = base * 0.78;    // external — pushed well clear of the human ring
     const F = base * 2.1;      // focal length
 
     const onRing = (deg, r, lat) => {
@@ -70,8 +70,8 @@
       });
     });
 
-    // external coupling — to the right, slightly up
-    const extP = onRing(-22, R3, R0 * 0.35);
+    // external coupling — out to the right and lifted up, well clear of the rings
+    const extP = onRing(-28, R3, R0 * 0.9);
     nodes.push({ id: "external", type: "external", p: extP, label: "External data" });
     conns.push({ a: { x: 0, y: 0, z: 0 }, b: extP, kind: "external", seed: sd() });
 
@@ -249,22 +249,29 @@
           ctx.setLineDash([1, 6]); ctx.lineCap = "round"; ctx.stroke(); ctx.setLineDash([]);
         }
 
-        // --- external coupling line (bold, greige, with arrowhead) ---
+        // --- external coupling line (bold, greige, curved away from the planet) ---
         let extConn = null;
         for (const cn of model.conns) if (cn.kind === "external") extConn = cn;
+        let extBez = null;
         if (extConn) {
           const rel = relConn(extConn);
           const a = project(view(extConn.a)), b = project(view(extConn.b));
           // start the visible line at the sphere edge toward the node
           let dx = b.x - a.x, dy = b.y - a.y; const dl = Math.hypot(dx, dy) || 1;
           const sx = a.x + (dx / dl) * R0k * 0.95, sy = a.y + (dy / dl) * R0k * 0.95;
+          // bow the curve outward (perpendicular to the line) so it arcs over the rings
+          const mx = (sx + b.x) / 2, my = (sy + b.y) / 2;
+          const bow = R0k * 1.15;
+          const ctlx = mx + (-dy / dl) * bow, ctly = my + (dx / dl) * bow;
+          extBez = { sx, sy, bx: b.x, by: b.y, ctlx, ctly, rel };
           const g = ctx.createLinearGradient(sx, sy, b.x, b.y);
-          g.addColorStop(0, rgba(c.warm, 0.18 * rel));
+          g.addColorStop(0, rgba(c.warm, 0.16 * rel));
           g.addColorStop(1, rgba(c.warm, 0.85 * rel));
-          ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(b.x, b.y);
+          ctx.beginPath(); ctx.moveTo(sx, sy); ctx.quadraticCurveTo(ctlx, ctly, b.x, b.y);
           ctx.strokeStyle = g; ctx.lineWidth = 2.4; ctx.lineCap = "round"; ctx.stroke();
-          // arrowhead pointing outward
-          const ang = Math.atan2(dy, dx);
+          // arrowhead pointing outward, tangent to the curve at the end
+          const tx = b.x - ctlx, ty = b.y - ctly;
+          const ang = Math.atan2(ty, tx);
           const ah = 9;
           ctx.beginPath();
           ctx.moveTo(b.x + Math.cos(ang) * ah, b.y + Math.sin(ang) * ah);
@@ -282,6 +289,7 @@
         const sp = speed(P.motion);
         for (const cn of model.conns) {
           if (cn.kind === "comms") continue; // comms particles drawn on the bezier below
+          if (cn.kind === "external") continue; // external particles drawn on its bezier below
           const rel = relConn(cn);
           if (rel <= 0.02) continue;
           const n = pcount(cn.kind, P.motion);
@@ -346,6 +354,23 @@
             ctx.fillStyle = rgba(c.warm, Math.min(1, edge * 6) * (0.85 * bz.rel));
             ctx.shadowColor = rgba(c.warm, 0.8); ctx.shadowBlur = 6;
             ctx.arc(x, y, 1.8, 0, TAU); ctx.fill(); ctx.shadowBlur = 0;
+          }
+        }
+
+        // --- external data particles travelling along its curve (two-way flow) ---
+        if (extBez) {
+          const en = pcount("external", P.motion);
+          for (let i = 0; i < en; i++) {
+            let pp = (t * sp / 6 + i / en + 0.31) % 1;
+            if (i % 2 === 1) pp = 1 - pp;
+            const u = 1 - pp;
+            const x = u * u * extBez.sx + 2 * u * pp * extBez.ctlx + pp * pp * extBez.bx;
+            const y = u * u * extBez.sy + 2 * u * pp * extBez.ctly + pp * pp * extBez.by;
+            const edge = Math.min(pp, 1 - pp);
+            ctx.beginPath();
+            ctx.fillStyle = rgba(c.warm, Math.min(1, edge * 6) * (0.95 * extBez.rel));
+            ctx.shadowColor = rgba(c.warm, 0.9); ctx.shadowBlur = 8;
+            ctx.arc(x, y, 2.1, 0, TAU); ctx.fill(); ctx.shadowBlur = 0;
           }
         }
 

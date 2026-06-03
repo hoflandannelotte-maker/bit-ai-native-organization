@@ -140,7 +140,7 @@
       fleets: [
         {
           id: "thought",
-          name: "Thought Leadership",
+          name: "Share",
           line: "Plans, writes and ships Bit's point of view across channels.",
           tasks: [
             "Plan and move the content calendar",
@@ -202,7 +202,7 @@
       fleets: [
         {
           id: "outreach",
-          name: "Outreach & Attract",
+          name: "Win",
           line: "Finds the opportunities worth our time and wins the work.",
           tasks: [
             "Scan the market for fit and trigger events",
@@ -220,7 +220,7 @@
         },
         {
           id: "maintain",
-          name: "Maintaining",
+          name: "Maintain",
           line: "Watches account health and grows the relationships we have.",
           tasks: [
             "Monitor account health across delivery and comms",
@@ -238,7 +238,7 @@
         },
         {
           id: "explore",
-          name: "Exploring",
+          name: "Explore",
           line: "Tests new markets, services and partnerships before we commit.",
           tasks: [
             "Research adjacent markets and propositions",
@@ -401,17 +401,21 @@
   ];
 
   // ---- Cross-fleet communication (fleets that talk to each other) ----------
-  // These links show real hand-offs between teams. Together they trace the
-  // company's loop: win the work, deliver it, run the numbers, tell the story,
-  // and keep the team staffed and growing.
+  // Links show real hand-offs between teams. Together they trace how work,
+  // people and stories move across the company.
   const LINKS = [
-    { a: "outreach", b: "prepare", label: "Won work → scoping" },        // Client Dev → Client Delivery
-    { a: "execute", b: "manage", label: "Delivery → invoicing & resourcing" }, // Client Delivery → Control
-    { a: "thought", b: "outreach", label: "Content feeds the pipeline" }, // Content → Client Dev
-    { a: "engage", b: "maintain", label: "Campaigns → account growth" },  // Content → Client Dev
-    { a: "exceed", b: "thought", label: "Great work → a story" },         // Client Delivery → Content
-    { a: "manage", b: "hire", label: "Resourcing → hiring" },            // Control → Culture
-    { a: "develop", b: "hire", label: "Growth ↔ hiring" },               // Culture (cross-fleet)
+    { a: "thought", b: "outreach", label: "Share ↔ Win" },          // Content ↔ Client Dev
+    { a: "thought", b: "explore", label: "Share ↔ Explore" },        // Content ↔ Client Dev
+    { a: "brand", b: "attract", label: "Employer branding" },        // Content ↔ Culture
+    { a: "exceed", b: "maintain", label: "Exceed ↔ Maintain" },      // Client Delivery ↔ Client Dev
+    { a: "execute", b: "govern", label: "Execute ↔ Govern" },        // Client Delivery ↔ Control
+    { a: "develop", b: "govern", label: "Develop & Keep ↔ Govern" }, // Culture ↔ Control
+    { a: "engage", b: "outreach", label: "Engage ↔ Win" },           // Content ↔ Client Dev
+    { a: "connect", b: "maintain", label: "Connect ↔ Maintain" },    // Client Delivery ↔ Client Dev
+    // the work loop: win the work, scope it, run the numbers, staff it
+    { a: "outreach", b: "prepare", label: "Won work → scoping" },    // Client Dev → Client Delivery
+    { a: "execute", b: "manage", label: "Delivery → invoicing" },    // Client Delivery → Control
+    { a: "manage", b: "hire", label: "Resourcing → hiring" },        // Control → Culture
   ];
 
   window.BRAIN = { CORE, EXTERNAL, HUMAN, TEAMS, LINKS };

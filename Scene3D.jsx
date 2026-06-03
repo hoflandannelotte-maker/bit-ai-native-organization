@@ -75,10 +75,32 @@
     nodes.push({ id: "external", type: "external", p: extP, label: "External data" });
     conns.push({ a: { x: 0, y: 0, z: 0 }, b: extP, kind: "external", seed: sd() });
 
-    // cross-fleet communication links
+    // cross-fleet communication links — sampled as 3D arcs that bow OUTWARD
+    // over the sphere, so they wrap the planet and rotate with everything else.
     (BRAIN.LINKS || []).forEach((lk) => {
-      if (fleetPos[lk.a] && fleetPos[lk.b])
-        conns.push({ a: fleetPos[lk.a], b: fleetPos[lk.b], kind: "comms", aId: lk.a, bId: lk.b, seed: sd() });
+      const A = fleetPos[lk.a], B = fleetPos[lk.b];
+      if (!A || !B) return;
+      // midpoint direction from centre → push the arc out past the fleet ring
+      const mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2, mz = (A.z + B.z) / 2;
+      const ml = Math.hypot(mx, my, mz) || 1;
+      const lift = R1 * 0.7;                 // how far the arc bulges out
+      const ctrl = {
+        x: mx + (mx / ml) * lift,
+        y: my + lift * 0.35,                 // a little vertical bow too
+        z: mz + (mz / ml) * lift,
+      };
+      // sample a quadratic bezier through 3D space, then keep each point on a
+      // smooth shell radius so the arc reads as part of the sphere
+      const SEG = 24, path = [];
+      for (let s = 0; s <= SEG; s++) {
+        const u = s / SEG, v = 1 - u;
+        path.push({
+          x: v * v * A.x + 2 * v * u * ctrl.x + u * u * B.x,
+          y: v * v * A.y + 2 * v * u * ctrl.y + u * u * B.y,
+          z: v * v * A.z + 2 * v * u * ctrl.z + u * u * B.z,
+        });
+      }
+      conns.push({ a: A, b: B, path, kind: "comms", aId: lk.a, bId: lk.b, seed: sd() });
     });
 
     return { cx, cy, base, R0, F, dots, nodes, conns };
@@ -231,41 +253,47 @@
           ctx.strokeStyle = g; ctx.lineWidth = on ? 1.5 : 1; ctx.stroke();
         }
 
-        // --- cross-fleet communication links (greige arcs around the planet) ---
-        const commsBez = [];
+        // --- cross-fleet communication links (3D arcs wrapping the planet) ---
+        // Each link carries a sampled 3D path; we project every point and stroke
+        // through them, so the arc bends over the sphere and rotates with it.
+        const commsArcs = [];
         for (const cn of model.conns) {
           if (cn.kind !== "comms") continue;
           const rel = relConn(cn);
-          const a = project(view(cn.a)), b = project(view(cn.b));
-          const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-          // bow the arc away from the planet centre
-          let dx = mx - cProj.x, dy = my - cProj.y; const dl = Math.hypot(dx, dy) || 1;
-          const bow = R0k * 0.9;
-          const ctlx = mx + (dx / dl) * bow, ctly = my + (dy / dl) * bow;
-          commsBez.push({ a, b, ctlx, ctly, rel, seed: cn.seed });
-          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.quadraticCurveTo(ctlx, ctly, b.x, b.y);
-          ctx.strokeStyle = rgba(c.warm, 0.5 * rel + 0.06);
+          if (rel <= 0.02) continue;
+          const pts = cn.path.map((p) => { const q = view(p); return { s: project(q), z: q.z }; });
+          commsArcs.push({ pts, rel, seed: cn.seed });
+          // average depth decides the base opacity (front arcs brighter)
+          let zsum = 0; for (const p of pts) zsum += p.z;
+          const zavg = zsum / pts.length;
+          const depth = clamp((zavg / (model.base * 0.5) + 1) / 2, 0, 1);
+          ctx.beginPath();
+          ctx.moveTo(pts[0].s.x, pts[0].s.y);
+          for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].s.x, pts[i].s.y);
+          ctx.strokeStyle = rgba(c.warm, (0.12 + 0.4 * depth) * rel + 0.05);
           ctx.lineWidth = rel > 0.9 ? 1.6 : 1.1;
           ctx.setLineDash([1, 6]); ctx.lineCap = "round"; ctx.stroke(); ctx.setLineDash([]);
         }
 
-        // --- external coupling line (bold, greige, curved away from the planet) ---
+        // --- external coupling line (bold, greige, from the brain's core outward) ---
         let extConn = null;
         for (const cn of model.conns) if (cn.kind === "external") extConn = cn;
         let extBez = null;
         if (extConn) {
           const rel = relConn(extConn);
           const a = project(view(extConn.a)), b = project(view(extConn.b));
-          // start the visible line at the sphere edge toward the node
-          let dx = b.x - a.x, dy = b.y - a.y; const dl = Math.hypot(dx, dy) || 1;
-          const sx = a.x + (dx / dl) * R0k * 0.95, sy = a.y + (dy / dl) * R0k * 0.95;
+          // start the visible line at the core CENTRE so it emerges from inside the brain
+          const sx = cProj.x, sy = cProj.y;
+          let dx = b.x - sx, dy = b.y - sy; const dl = Math.hypot(dx, dy) || 1;
           // bow the curve outward (perpendicular to the line) so it arcs over the rings
           const mx = (sx + b.x) / 2, my = (sy + b.y) / 2;
           const bow = R0k * 1.15;
           const ctlx = mx + (-dy / dl) * bow, ctly = my + (dx / dl) * bow;
           extBez = { sx, sy, bx: b.x, by: b.y, ctlx, ctly, rel };
           const g = ctx.createLinearGradient(sx, sy, b.x, b.y);
-          g.addColorStop(0, rgba(c.warm, 0.16 * rel));
+          // transparent at the core, so the line reads as growing out of the centre
+          g.addColorStop(0, rgba(c.warm, 0));
+          g.addColorStop(0.28, rgba(c.warm, 0.14 * rel));
           g.addColorStop(1, rgba(c.warm, 0.85 * rel));
           ctx.beginPath(); ctx.moveTo(sx, sy); ctx.quadraticCurveTo(ctlx, ctly, b.x, b.y);
           ctx.strokeStyle = g; ctx.lineWidth = 2.4; ctx.lineCap = "round"; ctx.stroke();
@@ -340,18 +368,21 @@
           }
         }
 
-        // --- comms particles travelling along the bezier (both directions) ---
+        // --- comms particles travelling along the 3D arcs (both directions) ---
         const cn2 = pcount("comms", P.motion);
-        for (const bz of commsBez) {
+        for (const arc of commsArcs) {
+          const pts = arc.pts, last = pts.length - 1;
           for (let i = 0; i < cn2; i++) {
-            let pp = (t * sp / 6 + i / cn2 + bz.seed) % 1;
+            let pp = (t * sp / 6 + i / cn2 + arc.seed) % 1;
             if (i % 2 === 1) pp = 1 - pp;
-            const u = 1 - pp;
-            const x = u * u * bz.a.x + 2 * u * pp * bz.ctlx + pp * pp * bz.b.x;
-            const y = u * u * bz.a.y + 2 * u * pp * bz.ctly + pp * pp * bz.b.y;
+            // walk the sampled polyline at fraction pp
+            const f = pp * last, idx = Math.floor(f), frac = f - idx;
+            const p0 = pts[idx].s, p1 = pts[Math.min(idx + 1, last)].s;
+            const x = p0.x + (p1.x - p0.x) * frac;
+            const y = p0.y + (p1.y - p0.y) * frac;
             const edge = Math.min(pp, 1 - pp);
             ctx.beginPath();
-            ctx.fillStyle = rgba(c.warm, Math.min(1, edge * 6) * (0.85 * bz.rel));
+            ctx.fillStyle = rgba(c.warm, Math.min(1, edge * 6) * (0.85 * arc.rel));
             ctx.shadowColor = rgba(c.warm, 0.8); ctx.shadowBlur = 6;
             ctx.arc(x, y, 1.8, 0, TAU); ctx.fill(); ctx.shadowBlur = 0;
           }

@@ -75,23 +75,24 @@
     nodes.push({ id: "external", type: "external", p: extP, label: "External data" });
     conns.push({ a: { x: 0, y: 0, z: 0 }, b: extP, kind: "external", seed: sd() });
 
-    // cross-fleet communication links — sampled as 3D arcs that bow OUTWARD
-    // over the sphere, so they wrap the planet and rotate with everything else.
+    // cross-fleet communication links — sampled as generous 3D arcs that loft
+    // HIGH above the sphere (like the hand-drawn sketch) and rotate with it.
+    // The control point is pushed far out along the midpoint direction so each
+    // link reads as a big sweeping bow over the planet.
     (BRAIN.LINKS || []).forEach((lk) => {
       const A = fleetPos[lk.a], B = fleetPos[lk.b];
       if (!A || !B) return;
-      // midpoint direction from centre → push the arc out past the fleet ring
       const mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2, mz = (A.z + B.z) / 2;
       const ml = Math.hypot(mx, my, mz) || 1;
-      const lift = R1 * 0.7;                 // how far the arc bulges out
+      // how wide apart the two fleets are → wider links arc higher
+      const span = Math.hypot(B.x - A.x, B.y - A.y, B.z - A.z);
+      const lift = R1 * 0.9 + span * 0.55;   // generous outward loft
       const ctrl = {
         x: mx + (mx / ml) * lift,
-        y: my + lift * 0.35,                 // a little vertical bow too
+        y: my + lift * 0.55,                  // strong vertical bow → arcs ride high
         z: mz + (mz / ml) * lift,
       };
-      // sample a quadratic bezier through 3D space, then keep each point on a
-      // smooth shell radius so the arc reads as part of the sphere
-      const SEG = 24, path = [];
+      const SEG = 30, path = [];
       for (let s = 0; s <= SEG; s++) {
         const u = s / SEG, v = 1 - u;
         path.push({
@@ -253,9 +254,10 @@
           ctx.strokeStyle = g; ctx.lineWidth = on ? 1.5 : 1; ctx.stroke();
         }
 
-        // --- cross-fleet communication links (3D arcs wrapping the planet) ---
-        // Each link carries a sampled 3D path; we project every point and stroke
-        // through them, so the arc bends over the sphere and rotates with it.
+        // --- cross-fleet communication links (high 3D arcs over the planet) ---
+        // Big sweeping bows that loft above the sphere. A segment only fades when
+        // it actually passes BEHIND the globe (negative depth + within the disc),
+        // so the high front of every arc stays bright and the back sinks away.
         const commsArcs = [];
         for (const cn of model.conns) {
           if (cn.kind !== "comms") continue;
@@ -263,16 +265,26 @@
           if (rel <= 0.02) continue;
           const pts = cn.path.map((p) => { const q = view(p); return { s: project(q), z: q.z }; });
           commsArcs.push({ pts, rel, seed: cn.seed });
-          // average depth decides the base opacity (front arcs brighter)
-          let zsum = 0; for (const p of pts) zsum += p.z;
-          const zavg = zsum / pts.length;
-          const depth = clamp((zavg / (model.base * 0.5) + 1) / 2, 0, 1);
-          ctx.beginPath();
-          ctx.moveTo(pts[0].s.x, pts[0].s.y);
-          for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].s.x, pts[i].s.y);
-          ctx.strokeStyle = rgba(c.warm, (0.12 + 0.4 * depth) * rel + 0.05);
-          ctx.lineWidth = rel > 0.9 ? 1.6 : 1.1;
-          ctx.setLineDash([1, 6]); ctx.lineCap = "round"; ctx.stroke(); ctx.setLineDash([]);
+          const lw = rel > 0.9 ? 1.7 : 1.1;
+          for (let i = 1; i < pts.length; i++) {
+            const a0 = pts[i - 1], a1 = pts[i];
+            const z = (a0.z + a1.z) / 2;
+            const mxs = (a0.s.x + a1.s.x) / 2, mys = (a0.s.y + a1.s.y) / 2;
+            // is this segment hidden behind the sphere?
+            const behind = z < 0 && Math.hypot(mxs - cProj.x, mys - cProj.y) < R0k * 0.96;
+            let a;
+            if (behind) a = 0.05 * rel;                 // tucked behind the globe → nearly gone
+            else {
+              const front = clamp((z / (model.base * 0.6) + 1) / 2, 0, 1);
+              a = (0.3 + 0.42 * front) * rel;            // high front arc → bright
+            }
+            ctx.beginPath();
+            ctx.moveTo(a0.s.x, a0.s.y);
+            ctx.lineTo(a1.s.x, a1.s.y);
+            ctx.strokeStyle = rgba(c.warm, a);
+            ctx.lineWidth = lw;
+            ctx.lineCap = "round"; ctx.stroke();
+          }
         }
 
         // --- external coupling line (bold, greige, from the brain's core outward) ---
@@ -350,7 +362,7 @@
           const s = it.s;
           if (it.kind === "dot") {
             const fr = (it.z / model.R0 + 1) / 2; // 0 back .. 1 front
-            const a = (0.1 + 0.62 * fr * fr) * (focus ? 0.4 : 1);
+            const a = (0.1 + 0.62 * fr * fr) * (focus ? 0.7 : 1);
             ctx.beginPath();
             ctx.fillStyle = rgba(c.accent, a);
             ctx.arc(s.x, s.y, Math.max(0.5, 1.1 * s.k), 0, TAU);
@@ -407,7 +419,7 @@
 
         // central brain glow (soft, cool)
         const halo = ctx.createRadialGradient(cProj.x, cProj.y, R0k * 0.15, cProj.x, cProj.y, R0k * 1.3);
-        halo.addColorStop(0, rgba("#cfe0ff", focus ? 0.12 : 0.22));
+        halo.addColorStop(0, rgba("#cfe0ff", focus ? 0.18 : 0.22));
         halo.addColorStop(1, rgba("#cfe0ff", 0));
         ctx.fillStyle = halo;
         ctx.beginPath(); ctx.arc(cProj.x, cProj.y, R0k * 1.3, 0, TAU); ctx.fill();
@@ -431,7 +443,7 @@
           if (focus) {
             if (nd.fleetId === selFleet || nd.id === selFleet) dim = 1;
             else if (nd.teamId === selTeam && nd.type === "human") dim = 0.85;
-            else dim = 0.14;
+            else dim = 0.32;
           }
 
           let vis;
@@ -471,7 +483,7 @@
         if (focus) {
           if (nd.fleetId === selFleet || nd.id === selFleet) dim = 1;
           else if (nd.teamId === selTeam && nd.type === "human") dim = 0.9;
-          else dim = 0.16;
+          else dim = 0.34;
         }
         ctx.globalAlpha = o * dim;
 

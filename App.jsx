@@ -129,7 +129,7 @@
           overflow: "auto",
         },
       },
-      React.createElement("img", { src: "images/bit-circle.png", alt: "Bit", style: { height: 44, width: 44, display: "block", marginBottom: "auto" } }),
+      React.createElement("img", { src: "bit-logo.png", alt: "Bit", style: { height: 44, width: 44, display: "block", marginBottom: "auto" } }),
       React.createElement("div", { style: { marginTop: 34 } },
         React.createElement("h1", { style: { margin: 0, fontSize: "clamp(38px, 4.4vw, 60px)", lineHeight: 0.96, fontWeight: 800, letterSpacing: "-0.03em", color: ink } },
           "The", React.createElement("br"), "Company", React.createElement("br"), "Brain"),

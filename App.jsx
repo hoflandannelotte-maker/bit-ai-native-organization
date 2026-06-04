@@ -53,7 +53,8 @@
 
     const lpad = Math.min(440, W * 0.34);
     const cxFrac = ((lpad + (W - lpad) * 0.5) / W) * 100;
-    const shift = selected ? -Math.min(220, W * 0.16) : 0;
+    const legendHidden = !!selected;        // hide the white block when exploring
+    const ctrlFrac = selected ? 50 : cxFrac; // controls follow the brain's centre
 
     return React.createElement(
       "div",
@@ -68,23 +69,35 @@
       // rocket fly-by (behind the legend block, above the universe)
       React.createElement(Rocket, { enabled: !!t.rocket, warm: colors.warm }),
 
-      // sliding 3D stage (shifts left when the panel opens)
+      // 3D stage (fills the canvas; the brain recentres itself on select)
       React.createElement(
         "div",
-        { style: { position: "absolute", inset: 0, transform: `translateX(${shift}px)`, transition: "transform .42s cubic-bezier(.22,.61,.36,1)" } },
+        { style: { position: "absolute", inset: 0 } },
         React.createElement(window.Scene3D, {
           size: { w: W, h: H }, colors, motion: t.motion, autoRotate, selected,
           onSelect, setActive: noop, BRAIN, _register: registerScene,
         })
       ),
 
-      // ---- the solid Bit-navy legend block (left) ----
-      React.createElement(LegendBlock, { colors, width: lpad }),
+      // ---- the solid Bit-navy legend block (left), slides away when exploring ----
+      React.createElement(
+        "div",
+        {
+          style: {
+            position: "absolute", left: 0, top: 0, height: "100%", width: lpad, zIndex: 40,
+            transform: legendHidden ? `translateX(${-lpad - 80}px)` : "translateX(0)",
+            opacity: legendHidden ? 0 : 1,
+            transition: "transform .46s cubic-bezier(.22,.61,.36,1), opacity .3s ease",
+            pointerEvents: legendHidden ? "none" : "auto",
+          },
+        },
+        React.createElement(LegendBlock, { colors, width: lpad })
+      ),
 
       // bottom controls (in the universe, to the right of the block)
       React.createElement(
         "div",
-        { style: { position: "absolute", left: `calc(${cxFrac}% + ${shift}px)`, transform: "translateX(-50%)", bottom: 28, zIndex: 45, display: "flex", alignItems: "center", gap: 10, transition: "left .42s cubic-bezier(.22,.61,.36,1)" } },
+        { style: { position: "absolute", left: `${ctrlFrac}%`, transform: "translateX(-50%)", bottom: 28, zIndex: 45, display: "flex", alignItems: "center", gap: 10, transition: "left .46s cubic-bezier(.22,.61,.36,1)" } },
         React.createElement(Btn, { colors, onClick: () => sceneApi.current && sceneApi.current.reset() }, "Reset view"),
         React.createElement(Btn, { colors, active: autoRotate, onClick: () => setAutoRotate((v) => !v) },
           React.createElement("span", { style: { width: 7, height: 7, borderRadius: "50%", background: autoRotate ? colors.warm : "transparent", border: `1.5px solid ${colors.warm}`, display: "inline-block", marginRight: 7, verticalAlign: "middle" } }),

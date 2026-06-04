@@ -14,15 +14,16 @@
   const TAU = 6.28318530718;
 
   // ---- build the unrotated 3D model from the data + viewport size ----------
-  function build(BRAIN, w, h) {
-    const lpad = Math.min(440, w * 0.34);          // the solid legend block
+  function build(BRAIN, w, h, lpadOverride) {
+    const lpad = lpadOverride != null ? lpadOverride : Math.min(440, w * 0.34); // the solid legend block
     const cx = lpad + (w - lpad) * 0.5;
     const cy = h * 0.52;
     const base = Math.min(w - lpad, h);
-    const R0 = base * 0.16;    // brain radius
-    const R1 = base * 0.305;   // fleet ring
-    const R2 = base * 0.45;    // human ring
-    const R3 = base * 0.78;    // external — pushed well clear of the human ring
+    const R0 = base * 0.15;    // brain radius
+    const R1 = base * 0.32;    // fleet ring
+    const RA = base * 0.46;    // agent ring (its own band, between fleets and humans)
+    const R2 = base * 0.62;    // human ring (pushed out so agents have room)
+    const R3 = base * 0.92;    // external — well clear of the human ring
     const F = base * 2.1;      // focal length
 
     const onRing = (deg, r, lat) => {
@@ -39,6 +40,13 @@
       const th = i * 2.399963229;
       dots.push({ x: Math.cos(th) * r * R0, y: y * R0, z: Math.sin(th) * r * R0 });
     }
+
+    // three guide rings around the brain (flat z-plane, drawn subtly)
+    const rings = [
+      { r: R1, kind: "fleet" },
+      { r: RA, kind: "agent" },
+      { r: R2, kind: "human" },
+    ];
 
     const nodes = [{ id: "core", type: "core", p: { x: 0, y: 0, z: 0 } }];
     const conns = [];
@@ -59,11 +67,13 @@
         nodes.push({ id: f.id, type: "fleet", teamId: team.id, p, label: f.name });
         conns.push({ a: { x: 0, y: 0, z: 0 }, b: p, kind: "spoke", teamId: team.id, fleetId: f.id, seed: sd() });
         conns.push({ a: humanP, b: p, kind: "human", teamId: team.id, fleetId: f.id, seed: sd() });
-        // agents fanned just outside the fleet node (shown on select)
+        // agents sit on their OWN ring (RA), tightly fanned around the fleet's
+        // angle so they never bleed into neighbouring teams. Shown on select.
         const m = f.agents.length;
+        const aSpan = Math.min(20, (m - 1) * 6); // tight fan, in degrees
         f.agents.forEach((aName, k) => {
-          const aOff = m > 1 ? (k - (m - 1) / 2) : 0;
-          const ap = onRing(fDeg + aOff * 12, R1 + base * 0.135, aOff * base * 0.016);
+          const aOff = m > 1 ? (k - (m - 1) / 2) * (aSpan / (m - 1)) : 0;
+          const ap = onRing(fDeg + aOff, RA, 0);
           nodes.push({ id: f.id + "~a" + k, type: "agent", teamId: team.id, fleetId: f.id, p: ap, label: aName });
           conns.push({ a: p, b: ap, kind: "agent", fleetId: f.id, seed: sd() });
         });
@@ -74,6 +84,16 @@
     const extP = onRing(-28, R3, R0 * 0.9);
     nodes.push({ id: "external", type: "external", p: extP, label: "External data" });
     conns.push({ a: { x: 0, y: 0, z: 0 }, b: extP, kind: "external", seed: sd() });
+
+    // a tiny dot-sphere for the external node, so it reads as a mini-brain
+    const extDots = [];
+    const NE = 80, RE = base * 0.03;
+    for (let i = 0; i < NE; i++) {
+      const y = 1 - (i / (NE - 1)) * 2;
+      const r = Math.sqrt(Math.max(0, 1 - y * y));
+      const th = i * 2.399963229;
+      extDots.push({ x: Math.cos(th) * r * RE, y: y * RE, z: Math.sin(th) * r * RE });
+    }
 
     // cross-fleet communication links — each one bows in its OWN direction and
     // height, so the set fans out all around the sphere (over, under, left,
@@ -114,7 +134,7 @@
       conns.push({ a: A, b: B, path, kind: "comms", aId: lk.a, bId: lk.b, seed: sd() });
     });
 
-    return { cx, cy, base, R0, F, dots, nodes, conns };
+    return { cx, cy, base, R0, F, dots, nodes, conns, rings, extDots };
   }
 
   function Scene3D(props) {
@@ -137,6 +157,7 @@
       let tween = null;
       let hover = null;
       let hitList = [];
+      let cxShift = 0; // eases the brain toward screen-centre when the legend hides
 
       function fit(w, h) {
         dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -176,7 +197,7 @@
       }
       function project(q) {
         const k = model.F / (model.F - q.z);
-        return { x: model.cx + q.x * k, y: model.cy - q.y * k, k, z: q.z };
+        return { x: model.cx + cxShift + q.x * k, y: model.cy - q.y * k, k, z: q.z };
       }
 
       function speed(m) { return m === "still" ? 0 : m === "lively" ? 0.62 : 0.3; }
@@ -209,6 +230,13 @@
         const { sel, selFleet, selTeam } = ctx2(P);
         const t = ts / 1000;
         const focus = !!selFleet; // focus mode dims the rest
+
+        // when a fleet is selected the left legend slides away, so glide the
+        // brain toward the centre of the now-full canvas
+        const lpadNow = Math.min(440, w * 0.34);
+        const cxTarget = focus ? -lpadNow / 2 : 0;
+        cxShift += (cxTarget - cxShift) * 0.12;
+        if (Math.abs(cxTarget - cxShift) < 0.4) cxShift = cxTarget;
 
         if (tween) {
           const k = clamp((t - tween.t0) / 0.6, 0, 1);
@@ -248,6 +276,27 @@
           if (sel === "core") return 0.7;
           return 0.4;
         };
+
+        // --- three subtle guide rings (fleet / agent / human bands) ---
+        // Drawn first, behind everything, as faint projected circles in the
+        // y=0 plane. They make the three layers legible without shouting.
+        for (const rg of model.rings) {
+          const SEG = 96;
+          ctx.beginPath();
+          for (let s = 0; s <= SEG; s++) {
+            const a = (s / SEG) * TAU;
+            const wp = { x: Math.cos(a) * rg.r, y: 0, z: Math.sin(a) * rg.r };
+            const sp = project(view(wp));
+            if (s === 0) ctx.moveTo(sp.x, sp.y); else ctx.lineTo(sp.x, sp.y);
+          }
+          // agent ring is hidden unless a fleet is selected; then it lifts a touch
+          const isAgent = rg.kind === "agent";
+          let alpha = rg.kind === "human" ? 0.07 : rg.kind === "fleet" ? 0.09 : 0.0;
+          if (isAgent) alpha = focus ? 0.11 : 0.04;
+          ctx.strokeStyle = rgba("#ffffff", alpha);
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
 
         // --- spoke + human lines (the core structure — kept clearly visible) ---
         for (const cn of model.conns) {
@@ -434,6 +483,28 @@
         ctx.fillStyle = halo;
         ctx.beginPath(); ctx.arc(cProj.x, cProj.y, R0k * 1.3, 0, TAU); ctx.fill();
 
+        // --- external node: a small dot-sphere, a mini-brain out in the world ---
+        let extNode = null;
+        for (const nd of model.nodes) if (nd.type === "external") extNode = nd;
+        if (extNode && model.extDots) {
+          const relE = relConn({ kind: "external" });
+          // depth-sort the mini-brain's own dots so it reads as a little globe
+          const eItems = model.extDots
+            .map((d) => {
+              const q = view({ x: extNode.p.x + d.x, y: extNode.p.y + d.y, z: extNode.p.z + d.z });
+              return { s: project(q), lz: d.z };
+            })
+            .sort((A, B) => A.lz - B.lz);
+          for (const it of eItems) {
+            const fr = (it.lz / (model.base * 0.03) + 1) / 2; // 0 back .. 1 front
+            const a = (0.22 + 0.7 * fr * fr) * relE;
+            ctx.beginPath();
+            ctx.fillStyle = rgba(c.warm, a);
+            ctx.arc(it.s.x, it.s.y, Math.max(0.5, 1.1 * it.s.k), 0, TAU);
+            ctx.fill();
+          }
+        }
+
         // --- labels (DOM) ---
         for (const nd of model.nodes) {
           if (nd.type === "core") continue;
@@ -517,16 +588,14 @@
           drawPerson(ctx, s.x, s.y, r, on ? c.warm : rgba(c.warm, 0.82));
           ctx.shadowBlur = 0;
         } else if (nd.type === "external") {
-          const r = (on ? 12 : 10) * k;
-          ctx.shadowColor = rgba(c.warm, 0.7); ctx.shadowBlur = on ? 16 : 9;
-          ctx.lineWidth = 2; ctx.strokeStyle = c.warm;
-          ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, TAU);
-          ctx.fillStyle = rgba(c.warm, on ? 0.22 : 0.1); ctx.fill(); ctx.stroke();
-          // little globe meridians
-          ctx.lineWidth = 1.2;
-          ctx.beginPath(); ctx.ellipse(s.x, s.y, r * 0.42, r, 0, 0, TAU); ctx.stroke();
-          ctx.beginPath(); ctx.moveTo(s.x - r, s.y); ctx.lineTo(s.x + r, s.y); ctx.stroke();
-          ctx.shadowBlur = 0;
+          // soft warm halo only; the dot-sphere itself is drawn in the frame
+          // loop (drawExternalBrain) where view/project are available.
+          const r = (on ? 13 : 11) * k;
+          const halo = ctx.createRadialGradient(s.x, s.y, r * 0.2, s.x, s.y, r * 1.6);
+          halo.addColorStop(0, rgba(c.warm, on ? 0.3 : 0.2));
+          halo.addColorStop(1, rgba(c.warm, 0));
+          ctx.fillStyle = halo;
+          ctx.beginPath(); ctx.arc(s.x, s.y, r * 1.6, 0, TAU); ctx.fill();
         }
         ctx.globalAlpha = 1;
       }

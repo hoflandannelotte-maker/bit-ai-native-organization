@@ -239,11 +239,15 @@
         const t = ts / 1000;
         const focus = !!selFleet; // focus mode dims the rest
 
-        // when a fleet is selected the left legend slides away, so glide the
-        // brain toward the centre of the now-full canvas
+        // when a fleet is selected the left legend slides away and the right
+        // detail panel opens; glide the brain to the centre of the space
+        // between them (a calm, flowy shift left)
         const lpadNow = Math.min(440, w * 0.34);
-        const cxTarget = focus ? -lpadNow / 2 : 0;
-        cxShift += (cxTarget - cxShift) * 0.12;
+        const modelCx = lpadNow + (w - lpadNow) * 0.5;
+        const panelW = P.panelW || 0;
+        const desiredCx = focus ? (w - panelW) * 0.5 : modelCx;
+        const cxTarget = desiredCx - modelCx;
+        cxShift += (cxTarget - cxShift) * 0.10;
         if (Math.abs(cxTarget - cxShift) < 0.4) cxShift = cxTarget;
 
         if (tween) {
@@ -286,8 +290,8 @@
           }
           // spokes: faint everywhere in rest, bright for the selection
           if (!sel) return 0.5;
-          if (selFleet) return cn.fleetId === selFleet ? 1 : 0.07;
-          if (selTeam) return cn.teamId === selTeam ? 1 : 0.07;
+          if (selFleet) return cn.fleetId === selFleet ? 1 : 0.03;
+          if (selTeam) return cn.teamId === selTeam ? 1 : 0.03;
           if (sel === "core") return 0.7;
           return 0.4;
         };
@@ -304,10 +308,11 @@
             const sp = project(view(wp));
             if (s === 0) ctx.moveTo(sp.x, sp.y); else ctx.lineTo(sp.x, sp.y);
           }
-          // agent ring is hidden unless a fleet is selected; then it lifts a touch
+          // rings recede strongly in focus so only the selected layer reads
           const isAgent = rg.kind === "agent";
           let alpha = rg.kind === "human" ? 0.07 : rg.kind === "fleet" ? 0.09 : 0.0;
-          if (isAgent) alpha = focus ? 0.11 : 0.04;
+          if (isAgent) alpha = focus ? 0.07 : 0.04;
+          if (focus && !isAgent) alpha *= 0.18;
           ctx.strokeStyle = rgba("#ffffff", alpha);
           ctx.lineWidth = 1;
           ctx.stroke();
@@ -540,8 +545,8 @@
           let dim = 1;
           if (focus) {
             if (nd.fleetId === selFleet || nd.id === selFleet) dim = 1;
-            else if (nd.teamId === selTeam && nd.type === "human") dim = 0.85;
-            else dim = 0.32;
+            else if (nd.teamId === selTeam && nd.type === "human") dim = 0.8;
+            else dim = 0.14;
           }
 
           let vis;
@@ -580,8 +585,8 @@
         let dim = 1;
         if (focus) {
           if (nd.fleetId === selFleet || nd.id === selFleet) dim = 1;
-          else if (nd.teamId === selTeam && nd.type === "human") dim = 0.9;
-          else dim = 0.34;
+          else if (nd.teamId === selTeam && nd.type === "human") dim = 0.8;
+          else dim = 0.14;
         }
         ctx.globalAlpha = o * dim;
 

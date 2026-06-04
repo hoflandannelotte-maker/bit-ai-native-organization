@@ -54,7 +54,10 @@
     const lpad = Math.min(440, W * 0.34);
     const cxFrac = ((lpad + (W - lpad) * 0.5) / W) * 100;
     const legendHidden = !!selected;        // hide the white block when exploring
-    const ctrlFrac = selected ? 50 : cxFrac; // controls follow the brain's centre
+    // when the right detail panel opens, the brain should sit centred in the
+    // space between the (hidden) left legend and the right panel
+    const panelW = selected ? Math.min(480, W * 0.34) : 0;
+    const ctrlFrac = selected ? ((W - panelW) * 0.5 / W) * 100 : cxFrac;
 
     return React.createElement(
       "div",
@@ -75,7 +78,7 @@
         { style: { position: "absolute", inset: 0 } },
         React.createElement(window.Scene3D, {
           size: { w: W, h: H }, colors, motion: t.motion, autoRotate, selected,
-          onSelect, setActive: noop, BRAIN, _register: registerScene,
+          onSelect, setActive: noop, BRAIN, _register: registerScene, panelW,
         })
       ),
 

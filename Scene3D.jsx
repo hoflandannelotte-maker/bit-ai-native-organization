@@ -166,6 +166,7 @@
       let hover = null;
       let hitList = [];
       let cxShift = 0; // eases the brain toward screen-centre when the legend hides
+      let zoom = 1, panX = 0, panY = 0; // eased zoom-to-fleet on selection
 
       function fit(w, h) {
         dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -204,8 +205,9 @@
         return { x, y, z };
       }
       function project(q) {
-        const k = model.F / (model.F - q.z);
-        return { x: model.cx + cxShift + q.x * k, y: model.cy - q.y * k, k, z: q.z };
+        const k = (model.F / (model.F - q.z)) * zoom;
+        const baseX = model.cx + cxShift;
+        return { x: baseX + q.x * k + panX, y: model.cy - q.y * k + panY, k, z: q.z };
       }
 
       function speed(m) { return m === "still" ? 0 : m === "lively" ? 0.62 : 0.3; }
@@ -249,6 +251,39 @@
         const cxTarget = desiredCx - modelCx;
         cxShift += (cxTarget - cxShift) * 0.10;
         if (Math.abs(cxTarget - cxShift) < 0.4) cxShift = cxTarget;
+
+        // --- eased zoom-to-fleet: gently zoom in and pan so the selected fleet
+        // and its agents sit centred in the space left of the detail panel ---
+        const Z = 1.55;                       // how far we zoom in on a fleet
+        const zoomTarget = focus ? Z : 1;
+        let panTargetX = 0, panTargetY = 0;
+        if (focus) {
+          // world centroid of the fleet node + its agents, so both are framed
+          let fx = 0, fy = 0, fz = 0, cnt = 0;
+          for (const nd of model.nodes) {
+            if (nd.type === "fleet" && nd.id === selFleet) { fx += nd.p.x; fy += nd.p.y; fz += nd.p.z; cnt++; }
+            else if (nd.type === "agent" && nd.fleetId === selFleet) { fx += nd.p.x; fy += nd.p.y; fz += nd.p.z; cnt++; }
+          }
+          if (cnt) {
+            fx /= cnt; fy /= cnt; fz /= cnt;
+            const q = view({ x: fx, y: fy, z: fz });
+            // where that centroid lands at the target zoom WITHOUT any pan
+            const kk = (model.F / (model.F - q.z)) * Z;
+            const sx = (model.cx + cxTarget) + q.x * kk; // baseX uses cxTarget for stable aim
+            const sy = model.cy - q.y * kk;
+            // desired on-screen spot: centred in the space left of the panel,
+            // a touch above middle so the agents below have room
+            const aimX = (w - (P.panelW || 0)) * 0.5;
+            const aimY = h * 0.46;
+            panTargetX = aimX - sx;
+            panTargetY = aimY - sy;
+          }
+        }
+        zoom += (zoomTarget - zoom) * 0.10;
+        panX += (panTargetX - panX) * 0.10;
+        panY += (panTargetY - panY) * 0.10;
+        if (Math.abs(zoomTarget - zoom) < 0.002) zoom = zoomTarget;
+        if (!focus && Math.abs(panX) < 0.4 && Math.abs(panY) < 0.4) { panX = 0; panY = 0; }
 
         if (tween) {
           const k = clamp((t - tween.t0) / 0.6, 0, 1);

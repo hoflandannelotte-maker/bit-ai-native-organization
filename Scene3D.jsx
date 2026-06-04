@@ -19,11 +19,11 @@
     const cx = lpad + (w - lpad) * 0.5;
     const cy = h * 0.52;
     const base = Math.min(w - lpad, h);
-    const R0 = base * 0.15;    // brain radius
-    const R1 = base * 0.32;    // fleet ring
-    const RA = base * 0.46;    // agent ring (its own band, between fleets and humans)
-    const R2 = base * 0.62;    // human ring (pushed out so agents have room)
-    const R3 = base * 0.92;    // external — well clear of the human ring
+    const R0 = base * 0.14;    // brain radius
+    const R1 = base * 0.27;    // fleet ring
+    const RA = base * 0.37;    // agent ring (its own band, between fleets and humans)
+    const R2 = base * 0.47;    // human ring
+    const R3 = base * 0.66;    // external — clear of the human ring
     const F = base * 2.1;      // focal length
 
     const onRing = (deg, r, lat) => {
@@ -69,11 +69,19 @@
         conns.push({ a: humanP, b: p, kind: "human", teamId: team.id, fleetId: f.id, seed: sd() });
         // agents sit on their OWN ring (RA), tightly fanned around the fleet's
         // angle so they never bleed into neighbouring teams. Shown on select.
+        // They sit loosely in the band (varied radius + a little depth) so they
+        // read as a cluster within the layer, not beads strung on the line.
         const m = f.agents.length;
-        const aSpan = Math.min(20, (m - 1) * 6); // tight fan, in degrees
+        const aSpan = Math.min(40, (m - 1) * 14); // wider fan, in degrees
         f.agents.forEach((aName, k) => {
           const aOff = m > 1 ? (k - (m - 1) / 2) * (aSpan / (m - 1)) : 0;
-          const ap = onRing(fDeg + aOff, RA, 0);
+          // stable per-agent jitter (no flicker): push some in, some out, and
+          // lift slightly off the y=0 plane so they don't lie on one arc
+          const j1 = (Math.sin((seed + k) * 91.17) % 1 + 1) % 1;
+          const j2 = (Math.sin((seed + k) * 53.31) % 1 + 1) % 1;
+          const rJit = RA * (0.82 + j1 * 0.34);          // radius spread within the band
+          const yJit = (j2 - 0.5) * base * 0.07;          // gentle depth off the plane
+          const ap = onRing(fDeg + aOff, rJit, yJit);
           nodes.push({ id: f.id + "~a" + k, type: "agent", teamId: team.id, fleetId: f.id, p: ap, label: aName });
           conns.push({ a: p, b: ap, kind: "agent", fleetId: f.id, seed: sd() });
         });

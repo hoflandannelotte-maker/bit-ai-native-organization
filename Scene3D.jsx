@@ -269,10 +269,17 @@
           if (cn.kind === "external") return sel === "external" || sel === "core" || !sel ? 1 : 0.25;
           if (cn.kind === "comms") return (sel === cn.aId || sel === cn.bId) ? 1 : 0;
           if (cn.kind === "agent") return selFleet === cn.fleetId ? 1 : 0;
-          // spoke / human
-          if (!sel) return 1;
-          if (selFleet) return cn.fleetId === selFleet ? 1 : 0.12;
-          if (selTeam) return cn.teamId === selTeam ? 1 : 0.12;
+          // human lines: shown ONLY for the selected fleet/team, never in rest.
+          // The human-to-team link is read from shared position, not a line.
+          if (cn.kind === "human") {
+            if (selFleet) return cn.fleetId === selFleet ? 1 : 0;
+            if (selTeam) return cn.teamId === selTeam ? 1 : 0;
+            return 0;
+          }
+          // spokes: faint everywhere in rest, bright for the selection
+          if (!sel) return 0.5;
+          if (selFleet) return cn.fleetId === selFleet ? 1 : 0.07;
+          if (selTeam) return cn.teamId === selTeam ? 1 : 0.07;
           if (sel === "core") return 0.7;
           return 0.4;
         };
@@ -298,7 +305,9 @@
           ctx.stroke();
         }
 
-        // --- spoke + human lines (the core structure — kept clearly visible) ---
+        // --- spoke + human lines ---
+        // Spokes stay very faint in rest (everything hangs off the centre);
+        // human lines appear only for the selection. The chosen fleet lights up.
         for (const cn of model.conns) {
           if (cn.kind !== "spoke" && cn.kind !== "human") continue;
           const rel = relConn(cn);
@@ -306,11 +315,11 @@
           const a = project(view(cn.a)), b = project(view(cn.b));
           const on = rel >= 0.99 && (selFleet === cn.fleetId || selTeam === cn.teamId);
           const g = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
-          const tip = on ? rgba(c.accent, 0.7 * rel) : rgba("#ffffff", 0.34 * rel);
-          if (cn.kind === "spoke") { g.addColorStop(0, rgba("#ffffff", 0)); g.addColorStop(0.4, rgba("#ffffff", 0.06 * rel)); g.addColorStop(1, tip); }
-          else { g.addColorStop(0, rgba(c.warm, 0.12 * rel)); g.addColorStop(1, on ? rgba(c.accent, 0.7 * rel) : rgba(c.warm, 0.34 * rel)); }
+          const tip = on ? rgba(c.accent, 0.75 * rel) : rgba("#ffffff", 0.22 * rel);
+          if (cn.kind === "spoke") { g.addColorStop(0, rgba("#ffffff", 0)); g.addColorStop(0.4, rgba("#ffffff", 0.04 * rel)); g.addColorStop(1, tip); }
+          else { g.addColorStop(0, rgba(c.warm, 0.14 * rel)); g.addColorStop(1, on ? rgba(c.accent, 0.75 * rel) : rgba(c.warm, 0.4 * rel)); }
           ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
-          ctx.strokeStyle = g; ctx.lineWidth = on ? 1.7 : 1.2; ctx.stroke();
+          ctx.strokeStyle = g; ctx.lineWidth = on ? 1.7 : 1.0; ctx.stroke();
         }
 
         // --- cross-fleet communication links (high 3D arcs over the planet) ---
